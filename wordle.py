@@ -19,18 +19,28 @@ def make_argparser():
   parser = argparse.ArgumentParser(add_help=False, description=DESCRIPTION, epilog=EPILOG)
   options = parser.add_argument_group('Options')
   options.add_argument('fixed',
-    help='The letters with known locations. Give dots for unknowns.')
+    help="The greens: letters with known locations. Give dots for unknowns. You can omit trailing "
+      "dots (this argument doesn't have to be 5 characters long).")
   options.add_argument('present',
-    help='The known letters without a known location.')
+    help='The yellows: known letters without a known location. You still need to give location '
+      "information, because we still know where they aren't. Because each position can have "
+      "multiple letters, the format is a little more complicated. Basically, it's the same as for "
+      "the greens, except you can give multiple letters at each position. And you need to separate "
+      "letters in adjacent positions with a '/', unless there's a dot in-between. Example: "
+      "'i/an.pac' means you've seen a yellow 'i' at position 1, 'a' and 'n' at position 2, and "
+      "'p', 'a', and 'c' at position 4.")
   options.add_argument('absent',
-    help='The letters known to be absent. Repeat letters are fine. It can also handle letters '
-      "present in the 'fixed' argument (they're ignored).")
+    help="The grays: letters known to be absent. Order and position doesn't matter. Repeat letters "
+      "are fine. It can also handle letters present in the 'fixed' argument (they're ignored). "
+      "Also, dots are valid (mainly so you can give an empty set as '.').")
   options.add_argument('-w', '--word-list', type=argparse.FileType('r'),
     default=DEFAULT_WORDLIST.open(),
     help=f'Word list to use. Default: {str(DEFAULT_WORDLIST)}')
   options.add_argument('-f', '--letter-freqs', type=argparse.FileType('r'),
     default=DEFAULT_FREQ_LIST.open(),
     help='File containing the frequencies of letters in all --word-length words.')
+  options.add_argument('-n', '--limit', type=int, default=15,
+    help='Only print the top N candidates. Default: %(default)s')
   options.add_argument('-L', '--word-length', default=5)
   options.add_argument('-h', '--help', action='help',
     help='Print this argument help text and exit.')
@@ -53,8 +63,16 @@ def main(argv):
   logging.basicConfig(stream=args.log, level=args.volume, format='%(message)s')
 
   fixed = parse_fixed(args.fixed)
-  present = set(args.present.lower())
-  absent = parse_absent(args.absent, fixed)
+  present = parse_present(args.present)
+  absent = set(args.absent.lower()) - set(fixed.keys()) - {'.'}
+
+  for place in fixed.values():
+    if place > args.word_length:
+      fail(f'Error: fixed ({place}) cannot be longer than --word-length ({args.word_length}).')
+  for places in present.values():
+    for place in places:
+      if place > args.word_length:
+        fail(f'Error: present ({place}) cannot be longer than --word-length ({args.word_length}).')
 
   words = read_wordlist(args.word_list, args.word_length)
   logging.info(f'Read {len(words)} {args.word_length} letter words.')
@@ -62,38 +80,76 @@ def main(argv):
 
   candidates = []
   for word in words:
-    candidate = True
-    for letter, place in fixed.items():
-      if word[place-1] != letter:
-        candidate = False
-    for letter in present:
-      if letter not in word:
-        candidate = False
-    for letter in absent:
-      if letter in word:
-        candidate = False
-    if candidate:
+    if is_candidate(word, fixed, present, absent):
       candidates.append(word)
 
   candidates.sort(key=lambda word: score_word(word, freqs), reverse=True)
-  print('\n'.join(candidates))
+  print('\n'.join(candidates[:args.limit]))
 
 
 def parse_fixed(fixed_str):
   fixed = {}
-  for place, letter in enumerate(fixed_str,1):
+  for place, letter in enumerate(fixed_str.lower(),1):
     if letter == '.':
       continue
-    fixed[letter.lower()] = place
+    fixed[letter] = place
   return fixed
 
 
-def parse_absent(absent_str, fixed):
-  absent = set()
-  for letter in absent_str.lower():
-    if letter not in fixed:
-      absent.add(letter)
-  return absent
+def parse_present(present_str):
+  # Test cases:
+  #   input: 'i/an.pac'
+  #   output: {'i': [1], 'a': [2, 4], 'n': [2], 'p': [4], 'c': [4]}
+  #   input: '...t'
+  #   output: {'t':[4]}
+  places = {}
+  place = 1
+  last_char = None
+  for char in present_str.lower():
+    debug_str = f'{char}: '
+    if char in '/|-':
+      place += 1
+      debug_str += f'Incrementing place to {place}'
+    elif char == '.':
+      if last_char is None:
+        pass
+      elif last_char in '/|-':
+        raise ValueError(
+          f'Invalid present string ({present_str!r}): Cannot have a {last_char!r} adjacent to a .'
+        )
+      elif last_char in string.ascii_lowercase:
+        # If the last character was a letter, increment it by an additional place.
+        debug_str += f'Incrementing place to {place}, then '
+        place += 1
+      place += 1
+      debug_str += f'Incrementing place to {place}'
+    else:
+      place_list = places.setdefault(char, [])
+      place_list.append(place)
+      debug_str += f'Storing at place {place}'
+    logging.debug(debug_str)
+    last_char = char
+  return places
+
+
+def is_candidate(word, fixed, present, absent):
+  # Exclude words without a "fixed" character in the right place.
+  for letter, place in fixed.items():
+    if word[place-1] != letter:
+      return False
+  for letter, places in present.items():
+    # Exclude words without a "present" character.
+    if letter not in word:
+      return False
+    # Exclude words with a "present" character in the place we know it isn't.
+    for place in places:
+      if word[place-1] == letter:
+        return False
+  # Exclude words with an "absent" character.
+  for letter in absent:
+    if letter in word:
+      return False
+  return True
 
 
 def score_word(word, freqs):
