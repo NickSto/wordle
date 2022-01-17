@@ -6,8 +6,8 @@ import string
 import sys
 
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
-DEFAULT_WORDLIST = pathlib.Path('~/aa/misc/ghent-word-list.tsv').expanduser()
-DEFAULT_FREQ_LIST = SCRIPT_DIR/'wordle-freqs.tsv'
+DEFAULT_WORDLIST = pathlib.Path(SCRIPT_DIR/'words.txt')
+DEFAULT_FREQ_LIST = SCRIPT_DIR/'letter-freqs.tsv'
 DESCRIPTION = """How much can a simple script help solve wordles?
 This gives a list of the possible words that fit what you currently know based on your previous
 guesses. Thus it can't tell you what to guess first. But based on the letter frequency of 5 letter
