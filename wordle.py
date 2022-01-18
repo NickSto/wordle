@@ -62,13 +62,19 @@ def main(argv):
 
   logging.basicConfig(stream=args.log, level=args.volume, format='%(message)s')
 
-  fixed = parse_fixed(args.fixed)
-  present = parse_present(args.present)
+  if len(args.fixed) > args.word_length:
+    fail(
+      f'Error: fixed ({len(args.fixed)}) cannot be longer than --word-length ({args.word_length}).'
+    )
+
+  fixed = parse_fixed(args.fixed, args.word_len)
+  try:
+    present = parse_present(args.present, args.word_len)
+  except IndexError:
+    logging.critical(f'Present characters longer than --word-length(?)')
+    raise
   absent = set(args.absent.lower()) - set(fixed.keys()) - {'.'}
 
-  for place in fixed.values():
-    if place > args.word_length:
-      fail(f'Error: fixed ({place}) cannot be longer than --word-length ({args.word_length}).')
   for places in present.values():
     for place in places:
       if place > args.word_length:
@@ -92,22 +98,22 @@ def get_candidates(words, freqs, fixed, present, absent):
   return candidates
 
 
-def parse_fixed(fixed_str):
-  fixed = {}
-  for place, letter in enumerate(fixed_str.lower(),1):
+def parse_fixed(fixed_str, word_len):
+  fixed = [''] * word_len
+  for i, letter in enumerate(fixed_str.lower()):
     if letter == '.':
       continue
-    fixed[letter] = place
+    fixed[i] = letter
   return fixed
 
 
-def parse_present(present_str):
+def parse_present(present_str, word_len):
   # Test cases:
   #   input: 'i/an.pac'
   #   output: {'i': [1], 'a': [2, 4], 'n': [2], 'p': [4], 'c': [4]}
   #   input: '...t'
   #   output: {'t':[4]}
-  places = {}
+  places = [''] * word_len
   place = 1
   last_char = None
   for char in present_str.lower():
@@ -129,30 +135,57 @@ def parse_present(present_str):
       place += 1
       debug_str += f'Incrementing place to {place}'
     else:
-      place_list = places.setdefault(char, [])
-      place_list.append(place)
+      places[place-1] += char
       debug_str += f'Storing at place {place}'
     logging.debug(debug_str)
     last_char = char
   return places
 
 
+def add_fixed(fixed, fixed_addition):
+  new_fixed = fixed.copy()
+  if len(fixed) != len(fixed_addition):
+    raise ValueError(f'Fixed arrays have different lengths ({len(fixed)} != {len(fixed_addition)})')
+  for i, letter in enumerate(fixed_addition):
+    if letter:
+      if fixed[i] and letter != fixed[i]:
+        raise ValueError(f'Different fixed letters in same place ({i+1}): {letter} != {fixed[i]}')
+      new_fixed[i] = letter
+  return new_fixed
+
+
+def add_present(present, present_addition):
+  new_present = present.copy()
+  if len(present) != len(present_addition):
+    raise ValueError(
+      f'Present arrays have different lengths ({len(present)} != {len(present_addition)})'
+    )
+  for i, new_letters in enumerate(present_addition):
+    old_letters = present[i]
+    new_present[i] = ''.join(set(new_letters) | set(old_letters))
+  return new_present
+
+
 def is_candidate(word, fixed, present, absent):
   # Exclude words without a "fixed" character in the right place.
-  for letter, place in fixed.items():
-    if word[place-1] != letter:
+  for i, letter in enumerate(fixed):
+    if letter and word[i] != letter:
+      logging.debug(f'{word}: Missing fixed letter {letter} at {i+1}')
       return False
-  for letter, places in present.items():
+  for place, letters in enumerate(present,1):
     # Exclude words without a "present" character.
-    if letter not in word:
-      return False
-    # Exclude words with a "present" character in the place we know it isn't.
-    for place in places:
-      if word[place-1] == letter:
+    for letter in letters:
+      if letter not in word:
+        logging.debug(f'{word}: Missing present letter {letter}')
         return False
+    # Exclude words with a "present" character in the place we know it isn't.
+    if word[place-1] in letters:
+      logging.debug(f'{word}: Has present letter {letter} at excluded position ({place})')
+      return False
   # Exclude words with an "absent" character.
   for letter in absent:
     if letter in word:
+      logging.debug(f'{word}: Has absent letter {letter}')
       return False
   return True
 
