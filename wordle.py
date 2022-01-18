@@ -78,13 +78,18 @@ def main(argv):
   logging.info(f'Read {len(words)} {args.word_length} letter words.')
   freqs = read_letter_freqs(args.letter_freqs)
 
+  candidates = get_candidates(words, freqs, fixed, present, absent)
+  logging.warning(f'{len(candidates)} possible words left.')
+  print('\n'.join(candidates[:args.limit]))
+
+
+def get_candidates(words, freqs, fixed, present, absent):
   candidates = []
   for word in words:
     if is_candidate(word, fixed, present, absent):
       candidates.append(word)
-
   candidates.sort(key=lambda word: score_word(word, freqs), reverse=True)
-  print('\n'.join(candidates[:args.limit]))
+  return candidates
 
 
 def parse_fixed(fixed_str):
