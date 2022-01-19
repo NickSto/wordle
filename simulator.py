@@ -12,7 +12,6 @@ DEFAULT_WORDLIST = SCRIPT_DIR/'words.txt'
 DEFAULT_FREQ_LIST = SCRIPT_DIR/'letter-freqs.tsv'
 DEFAULT_WORD_STATS = SCRIPT_DIR/'stats-ghent-plus.tsv'
 DESCRIPTION = """Simulate Wordle games and pit the solver algorithm against it."""
-GUESS_THRES = 0.25
 
 def make_argparser():
   parser = argparse.ArgumentParser(add_help=False, description=DESCRIPTION)
@@ -21,7 +20,7 @@ def make_argparser():
     help='Test on this specific answer.')
   options.add_argument('-A', '--answers', type=argparse.FileType('r'),
     help='Test on all the answers in this file and give summary statistics at the end.')
-  options.add_argument('-g', '--guess-thres', type=float, default=0.25,
+  options.add_argument('-g', '--guess-thres', type=float, default=0.05,
     help='Word score threshold above which this will attempt to solve. Default: %(default)s')
   options.add_argument('-w', '--word-list', type=argparse.FileType('r'),
     default=DEFAULT_WORDLIST.open(),
