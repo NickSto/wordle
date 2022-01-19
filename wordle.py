@@ -10,8 +10,7 @@ DEFAULT_WORDLIST = pathlib.Path(SCRIPT_DIR/'words.txt')
 DEFAULT_FREQ_LIST = SCRIPT_DIR/'letter-freqs.tsv'
 DESCRIPTION = """How much can a simple script help solve wordles?
 This gives a list of the possible words that fit what you currently know based on your previous
-guesses. Thus it can't tell you what to guess first. But based on the letter frequency of 5 letter
-words, ATONE is the best I've found."""
+guesses."""
 EPILOG = 'Wordle: https://www.powerlanguage.co.uk/wordle/'
 
 
@@ -67,18 +66,12 @@ def main(argv):
       f'Error: fixed ({len(args.fixed)}) cannot be longer than --word-length ({args.word_length}).'
     )
 
-  fixed = parse_fixed(args.fixed, args.word_len)
+  fixed = parse_fixed(args.fixed, args.word_length)
   try:
-    present = parse_present(args.present, args.word_len)
+    present = parse_present(args.present, args.word_length)
   except IndexError:
-    logging.critical(f'Present characters longer than --word-length(?)')
-    raise
-  absent = set(args.absent.lower()) - set(fixed.keys()) - {'.'}
-
-  for places in present.values():
-    for place in places:
-      if place > args.word_length:
-        fail(f'Error: present ({place}) cannot be longer than --word-length ({args.word_length}).')
+    fail(f'Present characters longer than --word-length(?)')
+  absent = set(args.absent.lower()) - set(fixed) - {'.',''}
 
   words = read_wordlist(args.word_list, args.word_length)
   logging.info(f'Read {len(words)} {args.word_length} letter words.')
@@ -202,14 +195,14 @@ def score_word(word, freqs):
   return score / (10**repeats)
 
 
-def read_wordlist(word_file, wordlen=5):
+def read_wordlist(word_file, wordlen=None):
   words = set()
   for line_raw in word_file:
     fields = line_raw.rstrip('\r\n').split()
     if not fields or fields[0].startswith('#'):
       continue
     word = fields[0].lower()
-    if len(word) != wordlen:
+    if wordlen is not None and len(word) != wordlen:
       continue
     invalid = False
     for letter in word:
