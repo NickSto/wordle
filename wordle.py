@@ -6,8 +6,9 @@ import string
 import sys
 
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
-DEFAULT_WORDLIST = pathlib.Path(SCRIPT_DIR/'words.txt')
+DEFAULT_WORDLIST = SCRIPT_DIR/'words.txt'
 DEFAULT_FREQ_LIST = SCRIPT_DIR/'letter-freqs.tsv'
+DEFAULT_WORD_STATS = pathlib.Path('~/aa/misc/ghent-word-list.tsv').expanduser()
 DESCRIPTION = """How much can a simple script help solve wordles?
 This gives a list of the possible words that fit what you currently know based on your previous
 guesses."""
@@ -34,13 +35,21 @@ def make_argparser():
       "Also, dots are valid (mainly so you can give an empty set as '.').")
   options.add_argument('-w', '--word-list', type=argparse.FileType('r'),
     default=DEFAULT_WORDLIST.open(),
-    help=f'Word list to use. Default: {str(DEFAULT_WORDLIST)}')
+    help='Word list to use. Default: '+str(DEFAULT_WORDLIST))
   options.add_argument('-f', '--letter-freqs', type=argparse.FileType('r'),
     default=DEFAULT_FREQ_LIST.open(),
-    help='File containing the frequencies of letters in all --word-length words.')
+    help='File containing the frequencies of letters in all --word-length words. Default: '
+      +str(DEFAULT_FREQ_LIST))
+  options.add_argument('-s', '--stats', type=argparse.FileType('r'),
+    default=DEFAULT_WORD_STATS.open(),
+    help='File containing statistics on words. This should be a tab-delimited file with at least '
+      'two columns: the word, and the proportion of people who recognize it (a float from 0 to 1). '
+      'Default: '+str(DEFAULT_WORD_STATS))
   options.add_argument('-n', '--limit', type=int, default=15,
     help='Only print the top N candidates. Default: %(default)s')
   options.add_argument('-L', '--word-length', default=5)
+  options.add_argument('-t', '--guess-thres',
+    help='Threshold score for when it should make a guess.')
   options.add_argument('-h', '--help', action='help',
     help='Print this argument help text and exit.')
   logs = parser.add_argument_group('Logging')
@@ -69,16 +78,21 @@ def main(argv):
   fixed = parse_fixed(args.fixed, args.word_length)
   try:
     present = parse_present(args.present, args.word_length)
-  except IndexError:
-    fail(f'Present characters longer than --word-length(?)')
+  except WordleError as error:
+    fail(error.message)
   absent = set(args.absent.lower()) - set(fixed) - {'.',''}
 
   words = read_wordlist(args.word_list, args.word_length)
   logging.info(f'Read {len(words)} {args.word_length} letter words.')
   freqs = read_letter_freqs(args.letter_freqs)
+  stats = read_word_stats(args.stats)
 
   candidates = get_candidates(words, freqs, fixed, present, absent)
   logging.warning(f'{len(candidates)} possible words left.')
+  result = get_guess(candidates, stats, thres=args.guess_thres)
+  if result:
+    guess, stat = result
+    print(f'Guess: {guess} (score: {stat:0.2f})')
   print('\n'.join(candidates[:args.limit]))
 
 
@@ -87,7 +101,7 @@ def get_candidates(words, freqs, fixed, present, absent):
   for word in words:
     if is_candidate(word, fixed, present, absent):
       candidates.append(word)
-  candidates.sort(key=lambda word: score_word(word, freqs), reverse=True)
+  candidates.sort(key=lambda word: score_letter_freqs(word, freqs), reverse=True)
   return candidates
 
 
@@ -118,8 +132,8 @@ def parse_present(present_str, word_len):
       if last_char is None:
         pass
       elif last_char in '/|-':
-        raise ValueError(
-          f'Invalid present string ({present_str!r}): Cannot have a {last_char!r} adjacent to a .'
+        raise WordleError(
+          f'Invalid present string ({present_str!r}): Cannot have a {last_char!r} adjacent to a .',
         )
       elif last_char in string.ascii_lowercase:
         # If the last character was a letter, increment it by an additional place.
@@ -128,7 +142,10 @@ def parse_present(present_str, word_len):
       place += 1
       debug_str += f'Incrementing place to {place}'
     else:
-      places[place-1] += char
+      if place > len(places):
+        raise WordleError(f'Present string longer than word length ({place} > {word_len})')
+      else:
+        places[place-1] += char
       debug_str += f'Storing at place {place}'
     logging.debug(debug_str)
     last_char = char
@@ -138,11 +155,13 @@ def parse_present(present_str, word_len):
 def add_fixed(fixed, fixed_addition):
   new_fixed = fixed.copy()
   if len(fixed) != len(fixed_addition):
-    raise ValueError(f'Fixed arrays have different lengths ({len(fixed)} != {len(fixed_addition)})')
+    raise WordleError(
+      f'Fixed arrays have different lengths ({len(fixed)} != {len(fixed_addition)})'
+    )
   for i, letter in enumerate(fixed_addition):
     if letter:
       if fixed[i] and letter != fixed[i]:
-        raise ValueError(f'Different fixed letters in same place ({i+1}): {letter} != {fixed[i]}')
+        raise WordleError(f'Different fixed letters in same place ({i+1}): {letter} != {fixed[i]}')
       new_fixed[i] = letter
   return new_fixed
 
@@ -150,7 +169,7 @@ def add_fixed(fixed, fixed_addition):
 def add_present(present, present_addition):
   new_present = present.copy()
   if len(present) != len(present_addition):
-    raise ValueError(
+    raise WordleError(
       f'Present arrays have different lengths ({len(present)} != {len(present_addition)})'
     )
   for i, new_letters in enumerate(present_addition):
@@ -183,7 +202,7 @@ def is_candidate(word, fixed, present, absent):
   return True
 
 
-def score_word(word, freqs):
+def score_letter_freqs(word, freqs):
   score = 0
   seen = set()
   repeats = 0
@@ -195,12 +214,35 @@ def score_word(word, freqs):
   return score / (10**repeats)
 
 
+def score_guesses(candidates, word_stats):
+  """Calculate a score for each guess based on the likelihood it's the correct answer.
+  This weights each word by a statistic like the percent of people who know it.
+  The algorithm takes the stat for each word and divides it by the sum of the stats for all the
+  candidate words. This is a weighted version of the naive case where each word has equal
+  probability: the score for each word would be 1/N. That should be the actual probability that
+  each word is correct. Instead here it's stat/sum_stats."""
+  stats = []
+  raw_stats = [word_stats.get(word,0) for word in candidates]
+  total = sum(raw_stats)
+  if total == 0:
+    return [0] * len(candidates)
+  for raw_stat in raw_stats:
+    stats.append(raw_stat/total)
+  return stats
+
+
+def get_guess(candidates, stats, thres=None):
+  weighted_stats = score_guesses(candidates, stats)
+  stat, word = sorted(zip(weighted_stats, candidates), reverse=True)[0]
+  if thres is None or stat >= thres:
+    return word, stat
+  else:
+    return None
+
+
 def read_wordlist(word_file, wordlen=None):
   words = set()
-  for line_raw in word_file:
-    fields = line_raw.rstrip('\r\n').split()
-    if not fields or fields[0].startswith('#'):
-      continue
+  for fields in read_tsv(word_file, min_columns=1):
     word = fields[0].lower()
     if wordlen is not None and len(word) != wordlen:
       continue
@@ -214,16 +256,42 @@ def read_wordlist(word_file, wordlen=None):
   return words
 
 
+def read_word_stats(stats_file):
+  stats = {}
+  for fields in read_tsv(stats_file, 2):
+    word = fields[0].lower()
+    stat = float(fields[1])
+    stats[word] = stat
+  return stats
+
+
 def read_letter_freqs(freqs_file):
   freqs = {}
-  for line_raw in freqs_file:
-    fields = line_raw.rstrip('\r\n').split()
-    if len(fields) < 2 or fields[0].startswith('#'):
-      continue
+  for fields in read_tsv(freqs_file, min_columns=2):
     letter = fields[0]
     count = int(fields[1])
     freqs[letter] = count
   return freqs
+
+
+def read_tsv(tsv_file, min_columns=None):
+  for line_raw in tsv_file:
+    fields = line_raw.rstrip('\r\n').split('\t')
+    if len(fields) > 0 and fields[0].startswith('#'):
+      continue
+    if min_columns is not None and len(fields) < min_columns:
+      raise WordleError(f'Too few columns ({len(fields)} < {min_columns})')
+    yield fields
+
+
+class WordleError(Exception):
+  def __init__(self, message, data=None):
+    super().__init__(message)
+    self.message = message
+    if data is None:
+      self.data = {}
+    else:
+      self.data = data
 
 
 def fail(message):
