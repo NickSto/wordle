@@ -8,10 +8,11 @@ import sys
 import wordle
 
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
-DEFAULT_WORDLIST = pathlib.Path(SCRIPT_DIR/'words.txt')
+DEFAULT_WORDLIST = SCRIPT_DIR/'words.txt'
 DEFAULT_FREQ_LIST = SCRIPT_DIR/'letter-freqs.tsv'
+DEFAULT_WORD_STATS = SCRIPT_DIR/'stats-ghent-plus.tsv'
 DESCRIPTION = """Simulate Wordle games and pit the solver algorithm against it."""
-
+GUESS_THRES = 0.25
 
 def make_argparser():
   parser = argparse.ArgumentParser(add_help=False, description=DESCRIPTION)
@@ -20,12 +21,20 @@ def make_argparser():
     help='Test on this specific answer.')
   options.add_argument('-A', '--answers', type=argparse.FileType('r'),
     help='Test on all the answers in this file and give summary statistics at the end.')
+  options.add_argument('-g', '--guess-thres', type=float, default=0.25,
+    help='Word score threshold above which this will attempt to solve. Default: %(default)s')
   options.add_argument('-w', '--word-list', type=argparse.FileType('r'),
     default=DEFAULT_WORDLIST.open(),
-    help=f'Word list to use. Default: {str(DEFAULT_WORDLIST)}')
+    help='Word list to use. Default: '+str(DEFAULT_WORDLIST))
   options.add_argument('-f', '--letter-freqs', type=argparse.FileType('r'),
     default=DEFAULT_FREQ_LIST.open(),
-    help='File containing the frequencies of letters in all --word-length words.')
+    help='File containing the frequencies of letters in all --word-length words. Default: '
+      +str(DEFAULT_FREQ_LIST))
+  options.add_argument('-s', '--stats', type=argparse.FileType('r'),
+    default=DEFAULT_WORD_STATS.open(),
+    help='File containing statistics on words. This should be a tab-delimited file with at least '
+      'two columns: the word, and the proportion of people who recognize it (a float from 0 to 1). '
+      'Default: '+str(DEFAULT_WORD_STATS))
   options.add_argument('-t', '--tsv', dest='format', default='human', action='store_const',
     const='tsv',
     help='Print tab-delimited, computer-readable stats at the end instead of human optimized '
@@ -63,14 +72,15 @@ def main(argv):
   words = wordle.read_wordlist(args.word_list, word_len)
   logging.info(f'Read {len(words)} {word_len} letter words.')
   freqs = wordle.read_letter_freqs(args.letter_freqs)
+  stats = wordle.read_word_stats(args.stats)
 
   if len(answers) == 1:
-    simulate_game(answers[0], words, freqs, verbose=True)
+    simulate_game(answers[0], words, freqs, stats, guess_thres=args.guess_thres, verbose=True)
   else:
     rounds = collections.Counter()
     start = last = time.perf_counter()
     for answer_num, answer in enumerate(answers,1):
-      round = simulate_game(answer, words, freqs, verbose=False)
+      round = simulate_game(answer, words, freqs, stats, guess_thres=args.guess_thres, verbose=False)
       rounds[round] += 1
       now = time.perf_counter()
       if now - last > 60:
@@ -86,7 +96,7 @@ def main(argv):
         print(f'{round}\t{count}\t{100*count/total:0.2f}')
 
 
-def simulate_game(answer, words, freqs, max_rounds=None, verbose=False):
+def simulate_game(answer, words, freqs, stats, guess_thres=None, max_rounds=None, verbose=False):
   word_len = len(answer)
   fixed = [''] * word_len
   present = [''] * word_len
@@ -98,7 +108,11 @@ def simulate_game(answer, words, freqs, max_rounds=None, verbose=False):
     candidates = wordle.get_candidates(words, freqs, fixed, present, absent)
     if len(candidates) <= 0:
       fail('No candidates found.')
-    guess = candidates[0]
+    result = wordle.get_guess(candidates, stats, thres=guess_thres)
+    if result:
+      guess = result[0]
+    else:
+      guess = candidates[0]
     if guess == answer:
       if verbose:
         print('  Found it!')
