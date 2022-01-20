@@ -48,7 +48,7 @@ def make_argparser():
   options.add_argument('-n', '--limit', type=int, default=15,
     help='Only print the top N candidates. Default: %(default)s')
   options.add_argument('-L', '--word-length', default=5)
-  options.add_argument('-t', '--guess-thres',
+  options.add_argument('-g', '--guess-thres', type=float,
     help='Threshold score for when it should make a guess.')
   options.add_argument('-h', '--help', action='help',
     help='Print this argument help text and exit.')
@@ -206,11 +206,12 @@ def score_letter_freqs(word, freqs):
   score = 0
   seen = set()
   repeats = 0
-  for letter in word:
+  for place, letter in enumerate(word,1):
     if letter in seen:
       repeats += 1
     seen.add(letter)
-    score += freqs[letter]
+    counts = freqs[letter]
+    score += counts[place]
   return score / (10**repeats)
 
 
@@ -269,8 +270,8 @@ def read_letter_freqs(freqs_file):
   freqs = {}
   for fields in read_tsv(freqs_file, min_columns=2):
     letter = fields[0]
-    count = int(fields[1])
-    freqs[letter] = count
+    counts = [int(field) for field in fields[1:]]
+    freqs[letter] = counts
   return freqs
 
 

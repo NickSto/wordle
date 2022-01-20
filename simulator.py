@@ -88,6 +88,7 @@ def main(argv):
     elapsed = time.perf_counter() - start
     logging.error(f'{len(answers)} games in {elapsed/60:0.1f} min')
     total = sum(rounds.values())
+    print('# '+' '.join(argv))
     for round, count in sorted(rounds.items()):
       if args.format == 'human':
         print(f'Round {round:2d}: {count} ({100*count/total:0.2f}%)')
@@ -140,6 +141,12 @@ def simulate_round(answer, guess):
     if answer[i] == letter:
       fixed[i] = letter
     elif letter in answer:
+      #TODO: It looks like this isn't technically correct in all situations.
+      #      If your guess includes multiple of the same letter, and one is in the right position,
+      #      that will appear green (fixed), but the other will be gray, not yellow.
+      #      See the one from 2022-01-02 (BOOST) and guess GLOSS.
+      #      This probably doesn't affect the simulator, because its definition of "fixed",
+      #      "present", and "absent" is consistent. But would a human receive different information?
       present[i] += letter
     else:
       absent.add(letter)
