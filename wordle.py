@@ -89,20 +89,11 @@ def main(argv):
 
   candidates = get_candidates(words, freqs, fixed, present, absent)
   logging.warning(f'{len(candidates)} possible words left.')
-  result = get_guess(candidates, stats, thres=args.guess_thres)
+  result = get_guess(candidates, stats, args.guess_thres)
   if result:
     guess, stat = result
     print(f'Guess: {guess} (score: {stat:0.2f})')
   print('\n'.join(candidates[:args.limit]))
-
-
-def get_candidates(words, freqs, fixed, present, absent):
-  candidates = []
-  for word in words:
-    if is_candidate(word, fixed, present, absent):
-      candidates.append(word)
-  candidates.sort(key=lambda word: score_letter_freqs(word, freqs), reverse=True)
-  return candidates
 
 
 def parse_fixed(fixed_str, word_len):
@@ -178,6 +169,15 @@ def add_present(present, present_addition):
   return new_present
 
 
+def get_candidates(words, freqs, fixed, present, absent):
+  candidates = []
+  for word in words:
+    if is_candidate(word, fixed, present, absent):
+      candidates.append(word)
+  candidates.sort(key=lambda word: score_letter_freqs(word, freqs), reverse=True)
+  return candidates
+
+
 def is_candidate(word, fixed, present, absent):
   # Exclude words without a "fixed" character in the right place.
   for i, letter in enumerate(fixed):
@@ -232,13 +232,25 @@ def score_guesses(candidates, word_stats):
   return stats
 
 
-def get_guess(candidates, stats, thres=None):
+def get_guess(candidates, stats, thres):
   weighted_stats = score_guesses(candidates, stats)
   stat, word = sorted(zip(weighted_stats, candidates), reverse=True)[0]
   if thres is None or stat >= thres:
     return word, stat
   else:
     return None
+
+
+def choose_word(words, freqs, stats, fixed, present, absent, guess_thres):
+  candidates = get_candidates(words, freqs, fixed, present, absent)
+  result = get_guess(candidates, stats, guess_thres)
+  if result:
+    guess = result[0]
+    return guess
+  elif candidates:
+    return candidates[0]
+  else:
+    raise WordleError('No words found which fit the constraints!')
 
 
 def read_wordlist(word_file, wordlen=None):

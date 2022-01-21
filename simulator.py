@@ -105,23 +105,16 @@ def simulate_game(answer, words, freqs, stats, guess_thres=None, max_rounds=None
   while True:
     if verbose:
       print(f'Round {round}')
-    candidates = wordle.get_candidates(words, freqs, fixed, present, absent)
-    if len(candidates) <= 0:
-      fail('No candidates found.')
-    result = wordle.get_guess(candidates, stats, thres=guess_thres)
-    if result:
-      guess = result[0]
-    else:
-      guess = candidates[0]
+    guess = wordle.choose_word(words, freqs, stats, fixed, present, absent, guess_thres)
+    if verbose:
+      print(f'  Guessing {guess}')
     if guess == answer:
       if verbose:
         print('  Found it!')
       break
-    if verbose:
-      print(f'  Guessing {guess} (from {len(candidates)})')
     new_fixed, new_present, new_absent = simulate_round(answer, guess)
-    feedback = format_feedback(guess, new_fixed, new_present, new_absent)
     if verbose:
+      feedback = format_feedback(guess, new_fixed, new_present, new_absent)
       print(f'  Result:  {feedback}')
     fixed = wordle.add_fixed(fixed, new_fixed)
     present = wordle.add_present(present, new_present)
