@@ -14,6 +14,8 @@ This gives a list of the possible words that fit what you currently know based o
 guesses."""
 EPILOG = 'Wordle: https://www.powerlanguage.co.uk/wordle/'
 
+#TODO: We spend a lot of time sorting candidates.
+#      We could probably save a lot of it by caching, even if it's just caching the first guess.
 
 def make_argparser():
   parser = argparse.ArgumentParser(add_help=False, description=DESCRIPTION, epilog=EPILOG)
@@ -87,7 +89,8 @@ def main(argv):
   freqs = read_letter_freqs(args.letter_freqs)
   stats = read_word_stats(args.stats)
 
-  candidates = get_candidates(words, freqs, fixed, present, absent)
+  candidates = get_candidates(words, fixed, present, absent)
+  sort_candidates(candidates, freqs)
   logging.warning(f'{len(candidates)} possible words left.')
   result = get_guess(candidates, stats, args.guess_thres)
   if result:
@@ -169,13 +172,16 @@ def add_present(present, present_addition):
   return new_present
 
 
-def get_candidates(words, freqs, fixed, present, absent):
+def get_candidates(words, fixed, present, absent):
   candidates = []
   for word in words:
     if is_candidate(word, fixed, present, absent):
       candidates.append(word)
-  candidates.sort(key=lambda word: score_letter_freqs(word, freqs), reverse=True)
   return candidates
+
+
+def sort_candidates(candidates, freqs):
+  candidates.sort(key=lambda word: score_letter_freqs(word, freqs), reverse=True)
 
 
 def is_candidate(word, fixed, present, absent):
@@ -242,19 +248,21 @@ def get_guess(candidates, stats, thres):
 
 
 def choose_word(words, freqs, stats, fixed, present, absent, guess_thres):
-  candidates = get_candidates(words, freqs, fixed, present, absent)
+  candidates = get_candidates(words, fixed, present, absent)
   result = get_guess(candidates, stats, guess_thres)
   if result:
     guess = result[0]
     return guess
   elif candidates:
+    sort_candidates(candidates, freqs)
     # If we're not trying to solve, guess new letters instead of ones we already know are right.
     tmp_absent = absent.copy() | set(''.join(fixed)) | set(''.join(present))
     tmp_fixed = tmp_present = ['']*len(fixed)
     if tmp_fixed == fixed == present:
       # Everything's empty. It's our first guess so the new candidates would be the same as the old.
       return candidates[0]
-    new_candidates = get_candidates(words, freqs, tmp_fixed, tmp_present, tmp_absent)
+    new_candidates = get_candidates(words, tmp_fixed, tmp_present, tmp_absent)
+    sort_candidates(candidates, freqs)
     if new_candidates:
       return new_candidates[0]
     else:
