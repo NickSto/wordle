@@ -4,6 +4,7 @@ import logging
 import pathlib
 import string
 import sys
+logger = logging.getLogger(__name__)
 
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
 DEFAULT_WORDLIST = SCRIPT_DIR/'words.txt'
@@ -194,25 +195,26 @@ def sort_candidates(candidates, freqs, cache=None):
 
 
 def is_candidate(word, fixed, present, absent):
+  debug = logger.getEffectiveLevel() <= logging.DEBUG
   # Exclude words without a "fixed" character in the right place.
   for i, letter in enumerate(fixed):
     if letter and word[i] != letter:
-      logging.debug(f'{word}: Missing fixed letter {letter} at {i+1}')
+      debug and logging.debug(f'{word}: Missing fixed letter {letter} at {i+1}')
       return False
   for place, letters in enumerate(present,1):
     # Exclude words without a "present" character.
     for letter in letters:
       if letter not in word:
-        logging.debug(f'{word}: Missing present letter {letter}')
+        debug and logging.debug(f'{word}: Missing present letter {letter}')
         return False
     # Exclude words with a "present" character in the place we know it isn't.
     if word[place-1] in letters:
-      logging.debug(f'{word}: Has present letter {letter} at excluded position ({place})')
+      debug and logging.debug(f'{word}: Has present letter {letter} at excluded position ({place})')
       return False
   # Exclude words with an "absent" character.
   for letter in absent:
     if letter in word:
-      logging.debug(f'{word}: Has absent letter {letter}')
+      debug and logging.debug(f'{word}: Has absent letter {letter}')
       return False
   return True
 
