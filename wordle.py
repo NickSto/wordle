@@ -248,12 +248,13 @@ def choose_word(words, freqs, stats, fixed, present, absent, guess_thres):
     guess = result[0]
     return guess
   elif candidates:
-    if all([letter == '' for letter in fixed]):
-      return candidates[0]
     # If we're not trying to solve, guess new letters instead of ones we already know are right.
-    tmp_absent = absent.copy() | set(fixed) - {''}
-    tmp_fixed = ['']*len(fixed)
-    new_candidates = get_candidates(words, freqs, tmp_fixed, present, tmp_absent)
+    tmp_absent = absent.copy() | set(''.join(fixed)) | set(''.join(present))
+    tmp_fixed = tmp_present = ['']*len(fixed)
+    if tmp_fixed == fixed == present:
+      # Everything's empty. It's our first guess so the new candidates would be the same as the old.
+      return candidates[0]
+    new_candidates = get_candidates(words, freqs, tmp_fixed, tmp_present, tmp_absent)
     if new_candidates:
       return new_candidates[0]
     else:
