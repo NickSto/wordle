@@ -90,7 +90,7 @@ def main(argv):
   stats = read_word_stats(args.stats)
 
   candidates = get_candidates(words, fixed, present, absent)
-  sort_candidates(candidates, freqs)
+  candidates = sort_candidates(candidates, freqs)
   logging.warning(f'{len(candidates)} possible words left.')
   result = get_guess(candidates, stats, args.guess_thres)
   if result:
@@ -180,8 +180,17 @@ def get_candidates(words, fixed, present, absent):
   return candidates
 
 
-def sort_candidates(candidates, freqs):
+def sort_candidates(candidates, freqs, cache=None):
+  if cache is not None:
+    tuple_candidates = tuple(candidates)
+    try:
+      return cache['sort'][tuple_candidates]
+    except KeyError:
+      pass
   candidates.sort(key=lambda word: score_letter_freqs(word, freqs), reverse=True)
+  if cache is not None:
+    cache['sort'][tuple_candidates] = candidates
+  return candidates
 
 
 def is_candidate(word, fixed, present, absent):
@@ -247,14 +256,14 @@ def get_guess(candidates, stats, thres):
     return None
 
 
-def choose_word(words, freqs, stats, fixed, present, absent, guess_thres):
+def choose_word(words, freqs, stats, fixed, present, absent, guess_thres, cache=None):
   candidates = get_candidates(words, fixed, present, absent)
   result = get_guess(candidates, stats, guess_thres)
   if result:
     guess = result[0]
     return guess
   elif candidates:
-    sort_candidates(candidates, freqs)
+    candidates = sort_candidates(candidates, freqs, cache=cache)
     # If we're not trying to solve, guess new letters instead of ones we already know are right.
     tmp_absent = absent.copy() | set(''.join(fixed)) | set(''.join(present))
     tmp_fixed = tmp_present = ['']*len(fixed)
@@ -262,13 +271,17 @@ def choose_word(words, freqs, stats, fixed, present, absent, guess_thres):
       # Everything's empty. It's our first guess so the new candidates would be the same as the old.
       return candidates[0]
     new_candidates = get_candidates(words, tmp_fixed, tmp_present, tmp_absent)
-    sort_candidates(candidates, freqs)
+    candidates = sort_candidates(candidates, freqs, cache=cache)
     if new_candidates:
       return new_candidates[0]
     else:
       return candidates[0]
   else:
     raise WordleError('No words found which fit the constraints!')
+
+
+def make_cache():
+  return {'sort':{}}
 
 
 def read_wordlist(word_file, wordlen=None):
