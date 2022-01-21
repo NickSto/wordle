@@ -76,10 +76,13 @@ def main(argv):
   if len(answers) == 1:
     simulate_game(answers[0], words, freqs, stats, guess_thres=args.guess_thres, verbose=True)
   else:
+    cache = wordle.make_cache()
     rounds = collections.Counter()
     start = last = time.perf_counter()
     for answer_num, answer in enumerate(answers,1):
-      round = simulate_game(answer, words, freqs, stats, guess_thres=args.guess_thres, verbose=False)
+      round = simulate_game(
+        answer, words, freqs, stats, cache=cache, guess_thres=args.guess_thres, verbose=False
+      )
       rounds[round] += 1
       now = time.perf_counter()
       if now - last > 60:
@@ -96,7 +99,9 @@ def main(argv):
         print(f'{round}\t{count}\t{100*count/total:0.2f}')
 
 
-def simulate_game(answer, words, freqs, stats, guess_thres=None, max_rounds=None, verbose=False):
+def simulate_game(
+    answer, words, freqs, stats, cache=None, guess_thres=None, max_rounds=None, verbose=False
+  ):
   word_len = len(answer)
   fixed = [''] * word_len
   present = [''] * word_len
@@ -105,7 +110,9 @@ def simulate_game(answer, words, freqs, stats, guess_thres=None, max_rounds=None
   while True:
     if verbose:
       print(f'Round {round}')
-    guess = wordle.choose_word(words, freqs, stats, fixed, present, absent, guess_thres)
+    guess = wordle.choose_word(
+      words, freqs, stats, fixed, present, absent, guess_thres, cache=cache
+    )
     if verbose:
       print(f'  Guessing {guess}')
     if guess == answer:
