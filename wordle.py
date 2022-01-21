@@ -108,9 +108,9 @@ def parse_fixed(fixed_str, word_len):
 def parse_present(present_str, word_len):
   # Test cases:
   #   input: 'i/an.pac'
-  #   output: {'i': [1], 'a': [2, 4], 'n': [2], 'p': [4], 'c': [4]}
+  #   output: ['i', 'an', '', 'pac', '']
   #   input: '...t'
-  #   output: {'t':[4]}
+  #   output: ['', '', '', 't', '']
   places = [''] * word_len
   place = 1
   last_char = None
@@ -248,7 +248,16 @@ def choose_word(words, freqs, stats, fixed, present, absent, guess_thres):
     guess = result[0]
     return guess
   elif candidates:
-    return candidates[0]
+    if all([letter == '' for letter in fixed]):
+      return candidates[0]
+    # If we're not trying to solve, guess new letters instead of ones we already know are right.
+    tmp_absent = absent.copy() | set(fixed) - {''}
+    tmp_fixed = ['']*len(fixed)
+    new_candidates = get_candidates(words, freqs, tmp_fixed, present, tmp_absent)
+    if new_candidates:
+      return new_candidates[0]
+    else:
+      return candidates[0]
   else:
     raise WordleError('No words found which fit the constraints!')
 
