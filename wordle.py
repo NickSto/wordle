@@ -93,7 +93,8 @@ def main(argv):
   if result:
     guess, stat = result
     print(f'Guess: {guess} (score: {stat:0.2f})')
-  print('\n'.join(candidates[:args.limit]))
+  new_candidates = get_new_candidates(candidates, words, freqs, fixed, present, absent)
+  print('\n'.join(new_candidates[:args.limit]))
 
 
 def parse_fixed(fixed_str, word_len):
@@ -249,18 +250,23 @@ def choose_word(words, freqs, stats, fixed, present, absent, guess_thres):
     return guess
   elif candidates:
     # If we're not trying to solve, guess new letters instead of ones we already know are right.
-    tmp_absent = absent.copy() | set(''.join(fixed)) | set(''.join(present))
-    tmp_fixed = tmp_present = ['']*len(fixed)
-    if tmp_fixed == fixed == present:
-      # Everything's empty. It's our first guess so the new candidates would be the same as the old.
-      return candidates[0]
-    new_candidates = get_candidates(words, freqs, tmp_fixed, tmp_present, tmp_absent)
+    new_candidates = get_new_candidates(candidates, words, freqs, fixed, present, absent)
     if new_candidates:
       return new_candidates[0]
     else:
       return candidates[0]
   else:
     raise WordleError('No words found which fit the constraints!')
+
+
+def get_new_candidates(candidates, words, freqs, fixed, present, absent):
+  new_absent = absent.copy() | set(''.join(fixed)) | set(''.join(present))
+  new_fixed = new_present = ['']*len(fixed)
+  if new_fixed == fixed == new_present == present:
+    # Everything's empty. It's our first guess so the new candidates would be the same as the old.
+    return candidates
+  else:
+    return get_candidates(words, freqs, new_fixed, new_present, new_absent)
 
 
 def read_wordlist(word_file, wordlen=None):
