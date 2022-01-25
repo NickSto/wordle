@@ -1,0 +1,17 @@
+.instructions, .letter-inputs {
+  margin-bottom: 30px;
+}
+
+.greens input {
+  width: 30px;
+  background-color: #c6eec2;
+}
+
+.yellows input {
+  width: 50px;
+  background-color: #e9e0ba;
+}
+
+.grays input {
+  background-color: #cccccc;
+}
