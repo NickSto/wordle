@@ -25,11 +25,9 @@
             <div class="letter-inputs greens">
               <label>Greens</label>
               <p>Enter each green letter you've found in the right place.</p>
-              <input type="text" name="green1">
-              <input type="text" name="green2">
-              <input type="text" name="green3">
-              <input type="text" name="green4">
-              <input type="text" name="green5">
+              {% for i in word_length_range %}
+                <input type="text" name="green{{ i }}">
+              {% endfor %}
             </div>
             <div class="letter-inputs yellows">
               <label>Yellows</label>
@@ -37,11 +35,9 @@
                   Enter each yellow letter you've found in the right place. You can put multiple
                   letters in the same box, if they appeared in the same position.
               </p>
-              <input type="text" name="yellow1">
-              <input type="text" name="yellow2">
-              <input type="text" name="yellow3">
-              <input type="text" name="yellow4">
-              <input type="text" name="yellow5">
+              {% for i in word_length_range %}
+                <input type="text" name="yellow{{ i }}">
+              {% endfor %}
             </div>
             <div class="letter-inputs grays">
               <label>Grays</label>

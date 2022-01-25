@@ -33,7 +33,7 @@ log.info(
 
 
 def main(request):
-  return render(request, 'wordle/main.tmpl')
+  return render(request, 'wordle/main.tmpl', {'word_length_range':range(1,WORD_LENGTH+1)})
 
 
 def guess(request):
