@@ -39,9 +39,9 @@ def main(request):
 def guess(request):
   params = QueryParams()
   for i in range(1,WORD_LENGTH+1):
-    params.add(f'green{i}', type=str)
-    params.add(f'yellow{i}', type=str)
-  params.add('grays', type=str)
+    params.add(f'green{i}', type=lower_strip_whitespace)
+    params.add(f'yellow{i}', type=lower_strip_whitespace)
+  params.add('grays', type=lower_strip_whitespace)
   params.parse(request.POST)
   if params.invalid_value:
     log.error('Invalid query parameter.')
@@ -50,22 +50,17 @@ def guess(request):
   present = []
   for i in range(1,WORD_LENGTH+1):
     # Greens
-    letter_raw = params[f'green{i}']
-    letter = letter_raw.lower().strip()
+    letter = params[f'green{i}']
     if not (len(letter) == 1 or letter == ''):
       error = f'Must provide one green letter per position. Received {letter!r} instead.'
       log.error(error)
       return HttpResponse(error, content_type=settings.PLAINTEXT)
     fixed.append(letter)
     # Yellows
-    letters_raw = params[f'yellow{i}']
-    # Remove whitespace from ends and between letters.
-    letters = ''.join(letters_raw.lower().strip().split())
+    letters = params[f'yellow{i}']
     present.append(letters)
   # Grays
-  letters_raw = params['grays']
-  # Remove whitespace from ends and between letters.
-  letters = ''.join(letters_raw.lower().strip().split())
+  letters = params['grays']
   absent = set(letters) - set(fixed) - {'.',''}
   log.info(f'Got fixed letters   {fixed!r}')
   log.info(f'Got present letters {present!r}')
@@ -76,3 +71,10 @@ def guess(request):
     log.error(error)
     return HttpResponse(error.message, content_type=settings.PLAINTEXT)
   return HttpResponse(guess, content_type=settings.PLAINTEXT)
+
+
+def lower_strip_whitespace(raw_value):
+  """Remove whitespace from the string (both internal and at the ends)."""
+  if raw_value is None:
+    return ''
+  return ''.join(raw_value.lower().strip().split())
