@@ -12,8 +12,11 @@ def make_argparser():
   parser = argparse.ArgumentParser(add_help=False, description=DESCRIPTION)
   options = parser.add_argument_group('Options')
   options.add_argument('words', metavar='word-list.txt', type=argparse.FileType('r'))
+  options.add_argument('-f', '--stats', type=argparse.FileType('r'),
+    help='Weight by word commonality data.')
   options.add_argument('-s', '--sort', action='store_true',
     help='Sort output by letter frequency instead of alphabetically.')
+  options.add_argument('-w', '--weight', type=float, default=1)
   options.add_argument('-l', '--word-length', type=int)
   options.add_argument('-h', '--help', action='help',
     help='Print this argument help text and exit.')
@@ -34,6 +37,9 @@ def main(argv):
   args = parser.parse_args(argv[1:])
 
   logging.basicConfig(stream=args.log, level=args.volume, format='%(message)s')
+  stats = None
+  if args.stats:
+    stats = wordle.read_word_stats(args.stats)
 
   freqs = {letter:[0] for letter in string.ascii_lowercase}
   for fields in wordle.read_tsv(args.words):
@@ -42,12 +48,16 @@ def main(argv):
       try:
         freqs[letter]
       except KeyError:
-        fail(f'Invalid character {letter!r}')
+        fail(f'Invalid character {letter!r} in word {word!r}')
       letter_freqs = freqs[letter]
-      letter_freqs[0] += 1
+      if stats is None or word not in stats:
+        weight = 1
+      else:
+        weight = stats[word]**2
+      letter_freqs[0] += 1 * weight
       while len(letter_freqs) <= place:
         letter_freqs.append(0)
-      letter_freqs[place] += 1
+      letter_freqs[place] += 1 * weight
 
   if args.sort:
     key_fxn = lambda item: -item[1][0]
@@ -58,7 +68,7 @@ def main(argv):
   for letter, counts in sorted(freqs.items(), key=key_fxn):
     print(letter, end='')
     for count in counts:
-      print(f'\t{count}', end='')
+      print(f'\t{round(count*args.weight)}', end='')
     print()
 
 
