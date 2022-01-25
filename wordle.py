@@ -234,6 +234,8 @@ def score_guesses(candidates, word_stats):
 
 
 def get_guess(candidates, stats, thres):
+  if not candidates:
+    return None
   weighted_stats = score_guesses(candidates, stats)
   stat, word = sorted(zip(weighted_stats, candidates), reverse=True)[0]
   if thres is None or stat >= thres:
