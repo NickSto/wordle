@@ -17,7 +17,6 @@ def make_argparser():
   options.add_argument('-s', '--sort', action='store_true',
     help='Sort output by letter frequency instead of alphabetically.')
   options.add_argument('-w', '--weight', type=float, default=1)
-  options.add_argument('-l', '--word-length', type=int)
   options.add_argument('-h', '--help', action='help',
     help='Print this argument help text and exit.')
   logs = parser.add_argument_group('Logging')
@@ -41,6 +40,7 @@ def main(argv):
   if args.stats:
     stats = wordle.read_word_stats(args.stats)
 
+  # Count up all letter occurrences in all words.
   freqs = {letter:[0] for letter in string.ascii_lowercase}
   for fields in wordle.read_tsv(args.words):
     word = fields[0].lower()
@@ -59,17 +59,29 @@ def main(argv):
         letter_freqs.append(0)
       letter_freqs[place] += 1 * weight
 
+  # Pad out the counts to the full word lengths.
+  max_word_len = 0
+  for counts in freqs.values():
+    max_word_len = max(max_word_len, len(counts))
+  logging.info(f'Max word length: {max_word_len}')
+  for counts in freqs.values():
+    while len(counts) < max_word_len:
+      counts.append(0)
+
+  # Define the sorting key according to the desired sort.
   if args.sort:
     key_fxn = lambda item: -item[1][0]
   else:
     key_fxn = lambda item: item[0]
 
+  # Print the results.
   print('# '+' '.join(argv))
   for letter, counts in sorted(freqs.items(), key=key_fxn):
-    print(letter, end='')
+    fields = [letter]
     for count in counts:
-      print(f'\t{round(count*args.weight)}', end='')
-    print()
+      weighted_count = round(count*args.weight)
+      fields.append(weighted_count)
+    print(*fields, sep='\t')
 
 
 def fail(message):
