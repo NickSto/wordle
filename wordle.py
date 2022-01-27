@@ -89,7 +89,7 @@ def main(argv):
 
   candidates = get_candidates(words, freqs, fixed, present, absent)
   logging.warning(f'{len(candidates)} possible words left.')
-  result = get_guess(candidates, stats, args.guess_thres)
+  result = get_answer_guess(candidates, stats, args.guess_thres)
   if result:
     guess, stat = result
     print(f'Guess: {guess} (score: {stat:0.2f})')
@@ -233,32 +233,48 @@ def score_guesses(candidates, word_stats):
   return stats
 
 
-def get_guess(candidates, stats, thres):
-  if not candidates:
+def get_answer_guess(candidates, stats, thres):
+  guesses = get_answer_guesses(candidates, stats)
+  if not guesses:
     return None
-  weighted_stats = score_guesses(candidates, stats)
-  stat, word = sorted(zip(weighted_stats, candidates), reverse=True)[0]
+  word, stat = guesses[0]
   if thres is None or stat >= thres:
     return word, stat
   else:
     return None
 
 
-def choose_word(words, freqs, stats, fixed, present, absent, guess_thres):
+def get_answer_guesses(candidates, stats):
+  weighted_stats = score_guesses(candidates, stats)
+  return sorted(zip(candidates, weighted_stats), key=lambda e: e[1], reverse=True)
+
+
+def choose_words(words, freqs, stats, fixed, present, absent, guess_thres, limit=None):
+  guesses = {'choice':None}
   candidates = get_candidates(words, freqs, fixed, present, absent)
-  result = get_guess(candidates, stats, guess_thres)
-  if result:
-    guess = result[0]
-    return guess
-  elif candidates:
-    # If we're not trying to solve, guess new letters instead of ones we already know are right.
-    new_candidates = get_new_candidates(candidates, words, freqs, fixed, present, absent)
-    if new_candidates:
-      return new_candidates[0]
-    else:
-      return candidates[0]
-  else:
+  # Make our best guess at the actual answer.
+  answer_guesses = get_answer_guesses(candidates, stats)
+  guesses['answers'] = answer_guesses[:limit]
+  if answer_guesses:
+    answer_guess, stat = answer_guesses[0]
+    if stat >= guess_thres:
+      guesses['choice'] = answer_guess
+  if not candidates:
     raise WordleError('No words found which fit the constraints!')
+  # If we're not trying to solve, guess new letters instead of ones we already know are right.
+  new_candidates = get_new_candidates(candidates, words, freqs, fixed, present, absent)
+  guesses['excluders'] = new_candidates[:limit]
+  if not guesses['choice']:
+    if new_candidates:
+      guesses['choice'] = new_candidates[0]
+    else:
+      guesses['choice'] = candidates[0]
+  return guesses
+
+
+def choose_word(words, freqs, stats, fixed, present, absent, guess_thres):
+  results = choose_words(words, freqs, stats, fixed, present, absent, guess_thres)
+  return results['choice']
 
 
 def get_new_candidates(candidates, words, freqs, fixed, present, absent):
