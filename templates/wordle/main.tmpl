@@ -12,44 +12,84 @@
 
       <h2 id="title">Wordle Solver</h2>
 
+      {% if error %}
+        <section class="panel panel-shrink">
+          <div class="panel-heading">
+            <h3>Error</h4>
+          </div>
+          <div class="panel-body">
+            <p>{{ error }}</p>
+          </div>
+        </section>
+        <div class="clearfix"></div>
+      {% endif %}
+
       <section class="panel panel-shrink">
         <div class="panel-heading">
-          <h4>Hints</h4>
+          <h3>Hints</h4>
         </div>
         <form class="panel-body" method="post" action="{% url 'wordle:guess' %}">
           {% csrf_token %}
-          <div class="panel-body">
-            <p class="instructions">
-              Fill in the hints you've gained from your guesses.
+          <p class="instructions">
+            Fill in the hints you've gained from your guesses.
+          </p>
+          <div class="letter-inputs greens">
+            <label>Greens</label>
+            <p>Enter each green letter you've found in the right place.</p>
+            {% for letter in fixed %}
+              <input type="text" name="green{{ forloop.counter }}" value="{{ letter }}">
+            {% endfor %}
+          </div>
+          <div class="letter-inputs yellows">
+            <label>Yellows</label>
+            <p>
+                Enter each yellow letter you've found in the right place. You can put multiple
+                letters in the same box, if they appeared in the same position.
             </p>
-            <div class="letter-inputs greens">
-              <label>Greens</label>
-              <p>Enter each green letter you've found in the right place.</p>
-              {% for i in word_length_range %}
-                <input type="text" name="green{{ i }}">
-              {% endfor %}
-            </div>
-            <div class="letter-inputs yellows">
-              <label>Yellows</label>
-              <p>
-                  Enter each yellow letter you've found in the right place. You can put multiple
-                  letters in the same box, if they appeared in the same position.
-              </p>
-              {% for i in word_length_range %}
-                <input type="text" name="yellow{{ i }}">
-              {% endfor %}
-            </div>
-            <div class="letter-inputs grays">
-              <label>Grays</label>
-              <p>Enter all the gray letters you've found.</p>
-              <input type="text" name="grays">
-            </div>
-            <div class="buttons">
-              <button class="btn btn-default" type="submit">Submit</button>
-            </div>
+            {% for letters in present %}
+              <input type="text" name="yellow{{ forloop.counter }}" value="{{ letters }}">
+            {% endfor %}
+          </div>
+          <div class="letter-inputs grays">
+            <label>Grays</label>
+            <p>Enter all the gray letters you've found.</p>
+            <input type="text" name="grays" value="{{ absent }}">
+          </div>
+          <div class="buttons">
+            <button class="btn btn-default" type="submit">Submit</button>
           </div>
         </form>
       </section>
+
+      {% if guesses %}
+        <div class="clearfix"></div>
+        <section class="panel panel-shrink">
+          <div class="panel-heading">
+            <h3>Guesses</h4>
+          </div>
+          <div class="panel-body">
+            <h4 id="choice">Best pick: <span class="word">{{ guesses.choice }}</span></h4>
+            <h4>Runners up</h4>
+            <p>
+              These are other possible picks. On the left are our best guesses at the actual answer, with the best picks
+              first. On the right are words which don't use any of the green or yellow letters, which you can use to
+              narrow down the possibilities.
+            </p>
+            <div class="guess-column float-left">
+              <h5>Answers</h5>
+              {% for guess in guesses.answers %}
+                <p class="word">{{ guess.0 }}</p>
+              {% endfor %}
+            </div>
+            <div class="guess-column float-right">
+              <h5>Excluders</h5>
+              {% for guess in guesses.excluders %}
+                <p class="word">{{ guess }}</p>
+              {% endfor %}
+            </div>
+          </div>
+        </section>
+      {% endif %}
 
     </div>
 {% endblock content %}

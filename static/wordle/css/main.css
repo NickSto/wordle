@@ -1,5 +1,13 @@
+.panel {
+  width: 600px;
+}
+
 .instructions, .letter-inputs {
   margin-bottom: 30px;
+}
+
+.letter-inputs input {
+  text-transform: uppercase;
 }
 
 .greens input, .yellows input {
@@ -17,4 +25,17 @@
 
 .grays input {
   background-color: #cccccc;
+}
+
+.word {
+  font-family: monospace;
+  text-transform: uppercase;
+}
+
+#choice .word {
+  font-size: 125%;
+}
+
+#choice {
+  margin-bottom: 25px;
 }

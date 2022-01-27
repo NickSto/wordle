@@ -13,6 +13,7 @@ log = logging.getLogger(__name__)
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
 WORD_LENGTH = 5
 GUESS_THRES = 0.05
+GUESSES_LENGTH = 15
 WORD_LIST_PATH = SCRIPT_DIR/'words.txt'
 FREQS_PATH = SCRIPT_DIR/'letter-freqs.tsv'
 STATS_PATH = SCRIPT_DIR/'stats-ghent-plus.tsv'
@@ -33,10 +34,16 @@ log.info(
 
 
 def main(request):
-  return render(request, 'wordle/main.tmpl', {'word_length_range':range(1,WORD_LENGTH+1)})
+  return render(request, 'wordle/main.tmpl', get_empty_context())
 
 
 def guess(request):
+  context = get_guess_context(request)
+  return render(request, 'wordle/main.tmpl', context)
+
+
+def get_guess_context(request):
+  context = get_empty_context()
   params = QueryParams()
   for i in range(1,WORD_LENGTH+1):
     params.add(f'green{i}', type=lower_strip_whitespace)
@@ -44,17 +51,16 @@ def guess(request):
   params.add('grays', type=lower_strip_whitespace)
   params.parse(request.POST)
   if params.invalid_value:
-    log.error('Invalid query parameter.')
-    return HttpResponse('Invalid input.', content_type=settings.PLAINTEXT)
+    return log_and_bundle_error(context, 'Invalid input.')
   fixed = []
   present = []
   for i in range(1,WORD_LENGTH+1):
     # Greens
     letter = params[f'green{i}']
     if not (len(letter) == 1 or letter == ''):
-      error = f'Must provide one green letter per position. Received {letter!r} instead.'
-      log.error(error)
-      return HttpResponse(error, content_type=settings.PLAINTEXT)
+      return log_and_bundle_error(
+        context, f'Must provide one green letter per position. Received {letter!r} instead.'
+      )
     fixed.append(letter)
     # Yellows
     letters = params[f'yellow{i}']
@@ -65,12 +71,30 @@ def guess(request):
   log.info(f'Got fixed letters   {fixed!r}')
   log.info(f'Got present letters {present!r}')
   log.info(f'Got absent letters  {"".join(absent)!r}')
+  context['fixed'] = fixed
+  context['present'] = present
+  context['absent'] = ''.join(absent)
   try:
-    guess = wordle.choose_word(WORDS, FREQS, STATS, fixed, present, absent, GUESS_THRES)
+    context['guesses'] = wordle.choose_words(
+      WORDS, FREQS, STATS, fixed, present, absent, GUESS_THRES, GUESSES_LENGTH
+    )
+    return context
   except wordle.WordleError as error:
-    log.error(error)
-    return HttpResponse(error.message, content_type=settings.PLAINTEXT)
-  return HttpResponse(guess, content_type=settings.PLAINTEXT)
+    return log_and_bundle_error(context, error.message)
+
+
+def get_empty_context():
+  return {
+    'fixed': [''] * WORD_LENGTH,
+    'present': [''] * WORD_LENGTH,
+    'absent': '',
+  }
+
+
+def log_and_bundle_error(context, error_str):
+  log.error(error_str)
+  context['error'] = error_str
+  return context
 
 
 def lower_strip_whitespace(raw_value):
