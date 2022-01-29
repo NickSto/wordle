@@ -15,7 +15,7 @@ WORD_LENGTH = 5
 GUESS_THRES = 0.05
 GUESSES_LENGTH = 15
 WORD_LIST_PATH = SCRIPT_DIR/'words.txt'
-FREQS_PATH = SCRIPT_DIR/'letter-freqs.tsv'
+FREQS_PATH = SCRIPT_DIR/'letter-freqs.answers.tsv'
 STATS_PATH = SCRIPT_DIR/'stats-ghent-plus.tsv'
 
 with WORD_LIST_PATH.open() as word_list_file:
