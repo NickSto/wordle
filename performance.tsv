@@ -1,8 +1,9 @@
-# ./simulator.py --tsv --answers wordle-src-answers.txt
-2	84	3.63
-3	765	33.05
-4	1021	44.10
-5	352	15.21
-6	72	3.11
-7	19	0.82
-8	2	0.09
+# ./simulator.py --tsv --letter-freqs letter-freqs.all-answers.tsv --answers wordle-src-answers.txt
+2	92	3.97
+3	813	35.12
+4	927	40.04
+5	374	16.16
+6	87	3.76
+7	16	0.69
+8	5	0.22
+10	1	0.04

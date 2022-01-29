@@ -7,7 +7,7 @@ import sys
 
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
 DEFAULT_WORDLIST = SCRIPT_DIR/'words.txt'
-DEFAULT_FREQ_LIST = SCRIPT_DIR/'letter-freqs.tsv'
+DEFAULT_FREQ_LIST = SCRIPT_DIR/'letter-freqs.all-answers.tsv'
 DEFAULT_WORD_STATS = SCRIPT_DIR/'stats-ghent-plus.tsv'
 DESCRIPTION = """How much can a simple script help solve wordles?
 This gives a list of the possible words that fit what you currently know based on your previous
