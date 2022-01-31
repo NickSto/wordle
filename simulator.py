@@ -13,6 +13,7 @@ DEFAULT_FREQ_LIST = SCRIPT_DIR/'letter-freqs.all-answers.tsv'
 DEFAULT_WORD_STATS = SCRIPT_DIR/'stats-ghent-plus.tsv'
 DESCRIPTION = """Simulate Wordle games and pit the solver algorithm against it."""
 
+
 def make_argparser():
   parser = argparse.ArgumentParser(add_help=False, description=DESCRIPTION)
   options = parser.add_argument_group('Options')
@@ -20,6 +21,8 @@ def make_argparser():
     help='Test on this specific answer.')
   options.add_argument('-A', '--answers', type=argparse.FileType('r'),
     help='Test on all the answers in this file and give summary statistics at the end.')
+  options.add_argument('-1', '--guess1',
+    help='Force it to use this as the first guess instead of the auto-generated one.')
   options.add_argument('-g', '--guess-thres', type=float, default=0.05,
     help='Word score threshold above which this will attempt to solve. Default: %(default)s')
   options.add_argument('-w', '--word-list', type=argparse.FileType('r'),
@@ -79,7 +82,9 @@ def main(argv):
     rounds = collections.Counter()
     start = last = time.perf_counter()
     for answer_num, answer in enumerate(answers,1):
-      round = simulate_game(answer, words, freqs, stats, guess_thres=args.guess_thres, verbose=False)
+      round = simulate_game(
+        answer, words, freqs, stats, guess_thres=args.guess_thres, guess1=args.guess1, verbose=False
+      )
       rounds[round] += 1
       now = time.perf_counter()
       if now - last > 60:
@@ -96,7 +101,9 @@ def main(argv):
         print(f'{round}\t{count}\t{100*count/total:0.2f}')
 
 
-def simulate_game(answer, words, freqs, stats, guess_thres=None, max_rounds=None, verbose=False):
+def simulate_game(
+    answer, words, freqs, stats, guess_thres=None, guess1=None, max_rounds=None, verbose=False
+  ):
   word_len = len(answer)
   fixed = [''] * word_len
   present = [''] * word_len
@@ -105,7 +112,10 @@ def simulate_game(answer, words, freqs, stats, guess_thres=None, max_rounds=None
   while True:
     if verbose:
       print(f'Round {round}')
-    guess = wordle.choose_word(words, freqs, stats, fixed, present, absent, guess_thres)
+    if guess1 and round == 1:
+      guess = guess1
+    else:
+      guess = wordle.choose_word(words, freqs, stats, fixed, present, absent, guess_thres)
     if verbose:
       print(f'  Guessing {guess}')
     if guess == answer:
