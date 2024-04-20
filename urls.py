@@ -1,10 +1,10 @@
-from django.conf.urls import url
+from django.urls import re_path
 
 from . import views
 
 app_name = 'wordle'
 
 urlpatterns = [
-  url(r'^$', views.main),
-  url(r'^guess$', views.guess, name='guess'),
+  re_path(r'^$', views.main),
+  re_path(r'^guess$', views.guess, name='guess'),
 ]
